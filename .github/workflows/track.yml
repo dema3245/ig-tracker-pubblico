@@ -45,7 +45,7 @@ jobs:
         continue-on-error: true
         env:
           PROFILES: ${{ secrets.PROFILES }}
-        run: python scripts/fetch.py
+        run: python -u scripts/fetch.py   # -u: log in tempo reale
 
       - name: Cifra i dati
         env:
