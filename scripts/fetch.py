@@ -18,7 +18,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROFILES_FILE = os.path.join(ROOT, "profiles.json")
@@ -51,6 +51,9 @@ APIFY_URL = ("https://api.apify.com/v2/acts/apify~instagram-profile-scraper/"
 APIFY_POSTS_URL = ("https://api.apify.com/v2/acts/apify~instagram-post-scraper/"
                    "run-sync-get-dataset-items?timeout=280")
 POSTS_PER_PROFILE = 12
+# Lo scraper dei post costa crediti per ogni post: lo usiamo al massimo una volta al giorno
+# per profilo (20 ore, così con un giro ogni 8 ore scatta un giro su tre)
+POSTS_REFRESH_HOURS = 20
 MAX_ATTEMPTS = 2
 TIMEOUT = 15  # secondi di attesa massima per ogni risposta di Instagram
 
@@ -281,14 +284,26 @@ def main():
             apify = fetch_apify(usernames, token)
         except Exception as e:  # noqa: BLE001
             apify, apify_error = {}, str(e)
-        missing = [u for u, it in apify.items()
-                   if it.get("username") and not it.get("private") and not it.get("latestPosts")]
+        missing, reused = [], 0
+        for u, it in apify.items():
+            if not it.get("username") or it.get("private") or it.get("latestPosts"):
+                continue
+            prev = profiles.get(u, {})
+            last = prev.get("posts_fetched_at")
+            if (last and prev.get("recent_posts") and datetime.now(timezone.utc) - datetime.fromisoformat(last)
+                    < timedelta(hours=POSTS_REFRESH_HOURS)):
+                it["_reuse_posts"], it["_posts_fetched_at"] = prev["recent_posts"], last
+                reused += 1
+            else:
+                missing.append(u)
+        if reused:
+            print(f"Post di {reused} profili già letti nelle ultime {POSTS_REFRESH_HOURS} ore: riuso quelli")
         if missing:
             print(f"Post mancanti per {len(missing)} profili: li chiedo allo scraper dei post")
             try:
                 extra = fetch_apify_posts(missing, token)
                 for u in missing:
-                    apify[u]["_extra_posts"] = extra.get(u, [])
+                    apify[u]["_extra_posts"], apify[u]["_posts_fetched_at"] = extra.get(u, []), ts
             except Exception as e:  # noqa: BLE001
                 print(f"  non riuscito: {e}")
     else:
@@ -309,6 +324,10 @@ def main():
                 if item.get("error") or not item.get("username"):
                     raise RuntimeError("profilo inesistente o non leggibile")
                 data = parse_apify(item, item.get("_extra_posts"))
+                if item.get("_reuse_posts"):
+                    data["recent_posts"] = item["_reuse_posts"]
+                if item.get("_posts_fetched_at"):
+                    data["posts_fetched_at"] = item["_posts_fetched_at"]
         except Exception as e:  # noqa: BLE001
             print(f"  ERRORE: {e}")
             prev = profiles.get(username, {"username": username})
@@ -339,7 +358,8 @@ def main():
             "avg_views": data["avg_views"],
         })
         save_json(hist_path, history)
-        archive_posts(username, posts, ts)
+        if not (apify and apify.get(username, {}).get("_reuse_posts")):
+            archive_posts(username, posts, ts)
 
     # Togli dalla dashboard i profili rimossi da profiles.json (lo storico resta)
     profiles = {u: profiles[u] for u in usernames if u in profiles}
