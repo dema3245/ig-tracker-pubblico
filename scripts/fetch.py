@@ -38,6 +38,10 @@ HEADERS = {
     "Accept": "application/json",
     "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
 }
+# Se c'è il secret APIFY_TOKEN i dati arrivano da Apify, che non viene bloccato
+# come i server di GitHub (HTTP 429). Senza token si interroga Instagram direttamente.
+APIFY_URL = ("https://api.apify.com/v2/acts/apify~instagram-profile-scraper/"
+             "run-sync-get-dataset-items?timeout=280")
 MAX_ATTEMPTS = 2
 TIMEOUT = 15  # secondi di attesa massima per ogni risposta di Instagram
 
@@ -139,6 +143,57 @@ def parse_user(u):
     }
 
 
+def fetch_apify(usernames, token):
+    """Un'unica chiamata per tutti i profili: ritorna {username: risultato Apify}."""
+    req = urllib.request.Request(
+        APIFY_URL, method="POST",
+        data=json.dumps({"usernames": usernames}).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=330) as resp:
+            items = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        hint = {401: "token non valido", 402: "crediti Apify esauriti"}.get(e.code, "")
+        raise RuntimeError(f"Apify HTTP {e.code} {hint}".strip())
+    return {(it.get("username") or "").lower(): it for it in items if isinstance(it, dict)}
+
+
+def parse_apify(it):
+    def num(v):
+        return v if isinstance(v, int) and v >= 0 else None
+
+    posts = []
+    for p in it.get("latestPosts") or []:
+        ts = None
+        try:
+            ts = int(datetime.fromisoformat(p["timestamp"].replace("Z", "+00:00")).timestamp())
+        except (KeyError, TypeError, ValueError, AttributeError):
+            pass
+        sc = p.get("shortCode")
+        posts.append({
+            "shortcode": sc,
+            "url": p.get("url") or (f"https://www.instagram.com/p/{sc}/" if sc else None),
+            "ts": ts,
+            "type": {"Video": "reel", "Sidecar": "carosello", "Image": "foto"}.get(p.get("type"), "post"),
+            "likes": num(p.get("likesCount")),
+            "comments": num(p.get("commentsCount")),
+            "views": num(p.get("videoViewCount")) or num(p.get("videoPlayCount")),
+            "caption": " ".join((p.get("caption") or "").split())[:160],
+        })
+    return {
+        "username": (it.get("username") or "").lower(),
+        "full_name": it.get("fullName") or "",
+        "bio": it.get("biography") or "",
+        "is_verified": bool(it.get("verified")),
+        "is_private": bool(it.get("private")),
+        "followers": num(it.get("followersCount")),
+        "following": num(it.get("followsCount")),
+        "posts_count": num(it.get("postsCount")),
+        "recent_posts": posts[:12],
+    }
+
+
 def avg(values):
     vals = [v for v in values if isinstance(v, (int, float))]
     return round(sum(vals) / len(vals), 1) if vals else None
@@ -169,13 +224,33 @@ def main():
     ts = now_iso()
     ok_count = 0
 
+    apify = None
+    apify_error = None
+    token = os.environ.get("APIFY_TOKEN", "").strip()
+    if token:
+        print("Fonte: Apify")
+        try:
+            apify = fetch_apify(usernames, token)
+        except Exception as e:  # noqa: BLE001
+            apify, apify_error = {}, str(e)
+    else:
+        print("Fonte: Instagram diretto (nessun APIFY_TOKEN)")
+
     for i, username in enumerate(usernames):
-        if i:
+        if i and apify is None:
             time.sleep(random.uniform(8, 18))  # ritmo "umano" tra un profilo e l'altro
         # Il repo è pubblico e i log di Actions pure: niente username nei log
         print(f"Profilo {i + 1}/{len(usernames)}")
         try:
-            data = parse_user(fetch_profile(username))
+            if apify is None:
+                data = parse_user(fetch_profile(username))
+            else:
+                item = apify.get(username)
+                if apify_error or not item:
+                    raise RuntimeError(apify_error or "profilo non restituito da Apify")
+                if item.get("error") or not item.get("username"):
+                    raise RuntimeError("profilo inesistente o non leggibile")
+                data = parse_apify(item)
         except Exception as e:  # noqa: BLE001
             print(f"  ERRORE: {e}")
             prev = profiles.get(username, {"username": username})

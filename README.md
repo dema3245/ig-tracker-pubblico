@@ -20,6 +20,9 @@ Chi apre il sito senza password vede solo la schermata di accesso.
 5. **Settings → Secrets and variables → Actions → New repository secret**, creane due:
    - `DASHBOARD_PASSWORD`: la password per entrare nella dashboard.
    - `PROFILES`: gli username da seguire, separati da virgola (es. `profilo1, profilo2`).
+   - `APIFY_TOKEN` (consigliato): il *Personal API token* di [Apify](https://apify.com) (*Settings → API & Integrations*).
+     Instagram blocca quasi sempre le richieste dai server di GitHub (HTTP 429); con Apify i dati arrivano lo stesso.
+     Senza questo secret lo script prova a interrogare Instagram direttamente.
 6. **Actions → Aggiorna tracker → Run workflow** per il primo giro.
 7. Dopo 1-2 minuti la dashboard è su `https://<tuo-utente>.github.io/<nome-repo>/`
    (il link esatto compare anche in *Settings → Pages*).

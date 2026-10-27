@@ -46,6 +46,7 @@ jobs:
         timeout-minutes: 10
         env:
           PROFILES: ${{ secrets.PROFILES }}
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: python -u scripts/fetch.py   # -u: log in tempo reale
 
       - name: Cifra i dati
