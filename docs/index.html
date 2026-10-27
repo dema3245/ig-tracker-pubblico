@@ -200,7 +200,7 @@ details.tok ol{padding-left:20px;margin:8px 0}
 
   <section class="foot" id="healthSec" hidden><h2>Stato del tracker</h2>
     <div class="scroll"><table id="health"></table></div>
-    <p class="muted">Dati pubblici di Instagram, raccolti ogni 6 ore. Le medie si riferiscono agli ultimi ~12 post.
+    <p class="muted">Dati pubblici di Instagram, raccolti ogni 8 ore. Le medie si riferiscono agli ultimi ~12 post.
       Engagement = (like medi + commenti medi) / follower. Le views sono disponibili solo per i reel.</p>
   </section>
 </div>
@@ -405,7 +405,7 @@ function head(p){
 function renderAlerts(){
   const out = [];
   const age = Date.now() - Date.parse(D.latest.updated);
-  if (age > 13*36e5) out.push(`<div class="alert">Il tracker non aggiorna i dati da ${ago(age)}. Controlla <a href="${ACTIONS_URL}" target="_blank" rel="noopener">GitHub Actions</a>.</div>`);
+  if (age > 17*36e5) out.push(`<div class="alert">Il tracker non aggiorna i dati da ${ago(age)}. Controlla <a href="${ACTIONS_URL}" target="_blank" rel="noopener">GitHub Actions</a>.</div>`);
   const bad = order().filter(u => !prof(u).ok);
   if (bad.length) out.push(`<div class="alert warn">Ultimo giro non riuscito per ${bad.map(u => "<b>@" + esc(u) + "</b>").join(", ")}: vengono mostrati gli ultimi dati validi. Dettagli in fondo alla pagina.</div>`);
   if (MANAGED) {
@@ -625,7 +625,7 @@ function toggleSort(s, k){ if (s.k === k) s.dir *= -1; else { s.k = k; s.dir = k
 
 function renderLive(){
   const age = Date.now() - Date.parse(D.latest.updated), ok = order().filter(u => prof(u).ok).length;
-  $("live").className = "live muted " + (age < 7*36e5 ? "on" : age < 13*36e5 ? "late" : "off");
+  $("live").className = "live muted " + (age < 9*36e5 ? "on" : age < 17*36e5 ? "late" : "off");
   $("upd").textContent = `Ultimo giro ${ago(age)} (${dateFmt.format(Date.parse(D.latest.updated))}) · ${ok}/${order().length} profili aggiornati`;
 }
 

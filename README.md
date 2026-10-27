@@ -1,7 +1,7 @@
 # Tracker profili Instagram (senza token)
 
 Segue i profili elencati nel secret `PROFILES` usando solo i dati pubblici di Instagram.
-Ogni 6 ore GitHub Actions scarica i dati, li salva **cifrati** nel repo e ripubblica la dashboard su GitHub Pages.
+Ogni 8 ore GitHub Actions scarica i dati, li salva **cifrati** nel repo e ripubblica la dashboard su GitHub Pages.
 
 **Protetto da password:** il repo è pubblico, ma i dati stanno solo in `docs/data.enc`, cifrato con AES-256
 e la password della dashboard. La lista dei profili è nei *Secrets* (invisibili) e i log di Actions non mostrano gli username.
@@ -37,7 +37,7 @@ Chi apre il sito senza password vede solo la schermata di accesso.
 - **Aggiorna ora:** con il token salvato lancia subito una raccolta; senza token apre la pagina di GitHub dove premere *Run workflow*.
 - **Cambiare password:** non cambiare solo il secret, altrimenti lo storico già cifrato non si legge più. Se la cambi, cancella anche `docs/data.enc` e `docs/profiles.enc` (lo storico riparte da zero e la lista profili torna al secret `PROFILES`).
 - **Aggiornare subito:** *Actions → Aggiorna tracker → Run workflow*.
-- **Cambiare frequenza:** in `.github/workflows/track.yml` la riga `cron: "17 */6 * * *"` (orario UTC). Sotto le 3 ore aumenta il rischio di blocchi.
+- **Cambiare frequenza:** in `.github/workflows/track.yml` la riga `cron: "17 */8 * * *"` (orario UTC). Sotto le 3 ore aumenta il rischio di blocchi.
 
 ## Se qualcosa non va
 
@@ -52,7 +52,7 @@ Chi apre il sito senza password vede solo la schermata di accesso.
 |---|---|
 | `scripts/fetch.py` | Scarica i dati (solo libreria standard di Python) |
 | `scripts/vault.py` | Cifra e decifra i dati con la password |
-| `.github/workflows/track.yml` | Pianificazione ogni 6 ore e pubblicazione |
+| `.github/workflows/track.yml` | Pianificazione ogni 8 ore e pubblicazione |
 | `docs/index.html` | La dashboard |
 | `docs/data.enc` | Dati, storico e archivio dei post cifrati (creato in automatico) |
 | `docs/profiles.enc` | Lista profili salvata dalla dashboard, cifrata |

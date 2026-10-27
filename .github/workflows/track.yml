@@ -2,7 +2,7 @@ name: Aggiorna tracker
 
 on:
   schedule:
-    - cron: "17 */6 * * *"   # ogni 6 ore (orario UTC)
+    - cron: "17 */8 * * *"   # ogni 8 ore: 00:17, 08:17, 16:17 UTC
   workflow_dispatch:          # pulsante "Run workflow" per lanciarlo a mano
   push:
     branches: [main]
