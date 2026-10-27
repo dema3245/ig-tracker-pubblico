@@ -1,0 +1,81 @@
+name: Aggiorna tracker
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"   # ogni 6 ore (orario UTC)
+  workflow_dispatch:          # pulsante "Run workflow" per lanciarlo a mano
+  push:
+    branches: [main]
+    paths:
+      - docs/index.html       # se modifichi la dashboard viene ripubblicata
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: tracker
+  cancel-in-progress: false
+
+jobs:
+  aggiorna:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installa la libreria di cifratura
+        run: pip install --quiet cryptography
+
+      - name: Decifra lo storico
+        env:
+          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+        run: python scripts/vault.py decrypt
+
+      - name: Scarica i dati pubblici dei profili
+        id: fetch
+        continue-on-error: true
+        env:
+          PROFILES: ${{ secrets.PROFILES }}
+        run: python scripts/fetch.py
+
+      - name: Cifra i dati
+        env:
+          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+        run: |
+          python scripts/vault.py encrypt
+          rm -rf docs/data   # i dati in chiaro non finiscono né nel repo né su Pages
+
+      - name: Salva i dati nel repo
+        run: |
+          git config user.name  "tracker-bot"
+          git config user.email "tracker-bot@users.noreply.github.com"
+          git add docs/data.enc
+          if git diff --cached --quiet; then
+            echo "Nessun dato nuovo."
+          else
+            git commit -m "Dati aggiornati $(date -u +'%Y-%m-%d %H:%M') UTC"
+            git pull --rebase origin main
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: Segnala se Instagram ha bloccato tutte le richieste
+        if: steps.fetch.outcome == 'failure'
+        run: |
+          echo "::warning::Nessun profilo aggiornato in questo giro (probabile blocco temporaneo di Instagram). La dashboard mostra gli ultimi dati validi."
+          exit 1

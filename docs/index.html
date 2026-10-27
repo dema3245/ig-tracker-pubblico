@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Tracker profili</title>
+<style>
+:root{
+  color-scheme:light;
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+  --line:#2a78d6; --line-fill:rgba(42,120,214,.10);
+  --up:#006300; --down:#d03b3b; --warn-bg:#fff4dc; --warn-ink:#7a5200;
+  --chip:#f0efec;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --line:#3987e5; --line-fill:rgba(57,135,229,.14);
+    --up:#0ca30c; --down:#e66767; --warn-bg:#3a2e12; --warn-ink:#f3c766;
+    --chip:#262624;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+  --line:#3987e5; --line-fill:rgba(57,135,229,.14);
+  --up:#0ca30c; --down:#e66767; --warn-bg:#3a2e12; --warn-ink:#f3c766;
+  --chip:#262624;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);
+  font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 16px 60px}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+h1{font-size:24px;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--ink-2);font-size:13px}
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+.seg{display:inline-flex;background:var(--chip);border-radius:8px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--ink-2);font:inherit;font-size:13px;
+  padding:5px 11px;border-radius:6px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--border)}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px}
+.table-wrap{overflow-x:auto;margin-bottom:22px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:10px 12px;text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{color:var(--muted);font-weight:500;font-size:12px;border-bottom:1px solid var(--grid);cursor:pointer;user-select:none}
+thead th[data-sort]::after{content:" ↕";opacity:.4}
+thead th.asc::after{content:" ↑";opacity:1}
+thead th.desc::after{content:" ↓";opacity:1}
+tbody tr+tr td{border-top:1px solid var(--grid)}
+td{font-variant-numeric:tabular-nums}
+.up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--muted)}
+a{color:inherit}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.card{padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.card-head{display:flex;gap:12px;align-items:center}
+.avatar{width:40px;height:40px;border-radius:50%;background:var(--chip);display:grid;place-items:center;
+  font-weight:600;color:var(--ink-2);flex:none}
+.name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.name a{text-decoration:none}.name a:hover{text-decoration:underline}
+.full{color:var(--ink-2);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hero{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.hero .n{font-size:32px;font-weight:650;letter-spacing:-.02em}
+.hero .lbl{color:var(--muted);font-size:13px}
+.deltas{display:flex;gap:14px;font-size:13px;flex-wrap:wrap}
+.deltas span b{font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 8px}
+.stat .v{font-weight:600;font-variant-numeric:tabular-nums}
+.stat .k{color:var(--muted);font-size:12px}
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .empty{color:var(--muted);font-size:13px;padding:22px 0;text-align:center}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--surface);font-size:12px;
+  padding:5px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-110%);opacity:0;transition:opacity .1s}
+.posts{font-size:13px}
+.posts summary{cursor:pointer;color:var(--ink-2)}
+.posts ul{list-style:none;margin:8px 0 0;padding:0}
+.posts li{display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--grid)}
+.posts .type{font-size:11px;background:var(--chip);border-radius:4px;padding:1px 6px;color:var(--ink-2);flex:none}
+.posts .cap{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2)}
+.posts .m{flex:none;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.warn{background:var(--warn-bg);color:var(--warn-ink);font-size:13px;border-radius:8px;padding:8px 10px}
+.note{color:var(--muted);font-size:12px;margin-top:28px}
+.msg{padding:40px 20px;text-align:center;color:var(--ink-2)}
+.lock{max-width:340px;margin:12vh auto;padding:24px;display:flex;flex-direction:column;gap:12px}
+.lock h1{font-size:20px}
+.lock input[type=password]{font:inherit;padding:9px 11px;border-radius:8px;border:1px solid var(--axis);
+  background:var(--page);color:var(--ink)}
+.lock .btn{font:inherit;font-weight:600;padding:9px 11px;border:0;border-radius:8px;background:var(--line);color:#fff;cursor:pointer}
+.lock label{font-size:13px;color:var(--ink-2);display:flex;gap:6px;align-items:center}
+.lock .err{color:var(--down);font-size:13px;min-height:1.2em;margin:0}
+[hidden]{display:none!important}
+@media (max-width:420px){.grid{grid-template-columns:1fr}.hero .n{font-size:28px}}
+</style>
+</head>
+<body>
+<form class="panel lock" id="lock" hidden>
+  <h1>Tracker profili</h1>
+  <div class="sub">Inserisci la password per vedere la dashboard.</div>
+  <input type="password" id="pw" autocomplete="current-password" placeholder="Password" required>
+  <label><input type="checkbox" id="remember" checked> Ricorda su questo dispositivo</label>
+  <button class="btn" type="submit">Entra</button>
+  <p class="err" id="pwerr"></p>
+</form>
+<div class="wrap" id="app" hidden>
+  <header>
+    <div>
+      <h1>Tracker profili</h1>
+      <div class="sub" id="updated">Caricamento…</div>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Periodo grafici" id="range">
+        <button data-days="7" aria-pressed="false">7 giorni</button>
+        <button data-days="30" aria-pressed="true">30 giorni</button>
+        <button data-days="0" aria-pressed="false">Tutto</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="panel table-wrap" id="summary"></div>
+  <div class="grid" id="cards"></div>
+
+  <p class="note">Dati pubblici di Instagram, raccolti ogni 6 ore senza login. Le medie si riferiscono agli ultimi ~12 post.
+  Engagement = (like medi + commenti medi) / follower. Le visualizzazioni sono disponibili solo per i reel.</p>
+</div>
+
+<script>
+const fmt = new Intl.NumberFormat("it-IT");
+const fmt1 = new Intl.NumberFormat("it-IT",{maximumFractionDigits:1});
+const n = v => v == null ? "—" : fmt.format(Math.round(v));
+const short = v => {
+  if (v == null) return "—";
+  const a = Math.abs(v);
+  if (a >= 1e6) return fmt1.format(v/1e6) + " Mln";
+  if (a >= 1e4) return fmt1.format(v/1e3) + "k";
+  return fmt.format(Math.round(v));
+};
+const dateFmt = new Intl.DateTimeFormat("it-IT",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+const dayFmt  = new Intl.DateTimeFormat("it-IT",{day:"numeric",month:"short"});
+const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+let RANGE = 30;
+try { const r = localStorage.getItem("range"); if (r !== null) RANGE = +r; } catch(e){}
+let STATE = {latest:null, hist:{}};
+let SORT = {key:"followers", dir:-1};
+
+async function getJSON(url){
+  const r = await fetch(url + "?v=" + Date.now(), {cache:"no-store"});
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+// Variazione rispetto al punto più vicino a "ore" fa (o al primo dato se lo storico è più corto)
+function delta(h, key, hours){
+  const pts = h.filter(p => p[key] != null);
+  if (pts.length < 2) return null;
+  const last = pts[pts.length-1];
+  const target = Date.parse(last.t) - hours*3600e3;
+  let base = pts[0];
+  for (const p of pts){ if (Date.parse(p.t) <= target) base = p; else break; }
+  if (base === last) return null;
+  return {v: last[key] - base[key], partial: Date.parse(base.t) > target + 3*3600e3};
+}
+function deltaHtml(d){
+  if (!d) return '<span class="flat">—</span>';
+  const cls = d.v > 0 ? "up" : d.v < 0 ? "down" : "flat";
+  const sign = d.v > 0 ? "+" : d.v < 0 ? "−" : "±";
+  return `<span class="${cls}" ${d.partial ? 'title="Storico più corto del periodo"' : ""}>${sign}${n(Math.abs(d.v))}${d.partial ? "*" : ""}</span>`;
+}
+function er(p){
+  if (!p.followers || p.avg_likes == null) return null;
+  return ((p.avg_likes || 0) + (p.avg_comments || 0)) / p.followers * 100;
+}
+
+function rows(){
+  const L = STATE.latest;
+  return L.order.filter(u => L.profiles[u]).map(u => {
+    const p = L.profiles[u], h = STATE.hist[u] || [];
+    return {u, p, h, followers:p.followers, d1:delta(h,"followers",24), d7:delta(h,"followers",168),
+      er:er(p), views:p.avg_views, likes:p.avg_likes};
+  });
+}
+
+function renderSummary(){
+  const R = rows();
+  const val = (r,k) => k==="d1"||k==="d7" ? (r[k]?.v ?? -Infinity) : (r[k] ?? -Infinity);
+  if (SORT.key === "u") R.sort((a,b)=> SORT.dir * a.u.localeCompare(b.u));
+  else R.sort((a,b)=> SORT.dir * (val(a,SORT.key) - val(b,SORT.key)));
+  const cols = [["u","Profilo"],["followers","Follower"],["d1","24 ore"],["d7","7 giorni"],
+                ["likes","Like medi"],["views","Views medie reel"],["er","Engagement"]];
+  const th = cols.map(([k,l]) => `<th data-sort="${k}" class="${SORT.key===k ? (SORT.dir>0?"asc":"desc") : ""}">${l}</th>`).join("");
+  const tb = R.map(r => `<tr>
+    <td><a href="#p-${esc(r.u)}">@${esc(r.u)}</a>${r.p.ok===false ? ' <span title="Ultimo aggiornamento fallito">⚠️</span>' : ""}</td>
+    <td>${n(r.followers)}</td><td>${deltaHtml(r.d1)}</td><td>${deltaHtml(r.d7)}</td>
+    <td>${n(r.likes)}</td><td>${n(r.views)}</td><td>${r.er==null ? "—" : fmt1.format(r.er) + "%"}</td></tr>`).join("");
+  const el = document.getElementById("summary");
+  el.innerHTML = `<table><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table>`;
+  el.querySelectorAll("th[data-sort]").forEach(t => t.onclick = () => {
+    const k = t.dataset.sort;
+    SORT = {key:k, dir: SORT.key===k ? -SORT.dir : (k==="u" ? 1 : -1)};
+    renderSummary();
+  });
+}
+
+function chartSvg(h){
+  const now = h.length ? Date.parse(h[h.length-1].t) : 0;
+  const pts = h.filter(p => p.followers != null && (!RANGE || Date.parse(p.t) >= now - RANGE*864e5))
+               .map(p => ({x:Date.parse(p.t), y:p.followers, t:p.t}));
+  if (pts.length < 2) return {html:'<div class="empty">Il grafico appare dopo almeno due rilevazioni.</div>', pts:[]};
+  const W=320,H=120,pl=6,pr=6,pt=10,pb=20;
+  const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
+  const x0=Math.min(...xs), x1=Math.max(...xs);
+  let y0=Math.min(...ys), y1=Math.max(...ys);
+  const pad=Math.max(1,(y1-y0)*.15); y0-=pad; y1+=pad;
+  const X=x=>pl+(x-x0)/(x1-x0||1)*(W-pl-pr), Y=y=>pt+(1-(y-y0)/(y1-y0||1))*(H-pt-pb);
+  const d=pts.map((p,i)=>(i?"L":"M")+X(p.x).toFixed(1)+" "+Y(p.y).toFixed(1)).join("");
+  const area=d+`L${X(x1).toFixed(1)} ${H-pb}L${X(x0).toFixed(1)} ${H-pb}Z`;
+  const html=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Andamento follower">
+    <line x1="${pl}" x2="${W-pr}" y1="${H-pb}" y2="${H-pb}" stroke="var(--axis)" stroke-width="1"/>
+    <path d="${area}" fill="var(--line-fill)"/>
+    <path d="${d}" fill="none" stroke="var(--line)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <text x="${pl}" y="${H-5}" font-size="10" fill="var(--muted)">${dayFmt.format(x0)}</text>
+    <text x="${W-pr}" y="${H-5}" font-size="10" fill="var(--muted)" text-anchor="end">${dayFmt.format(x1)}</text>
+    <line class="xh" y1="${pt}" y2="${H-pb}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2 3" opacity="0"/>
+    <circle class="dot" r="4" fill="var(--line)" stroke="var(--surface)" stroke-width="2" opacity="0"/>
+    <rect class="hit" x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
+  </svg><div class="tip"></div>`;
+  return {html, pts:pts.map(p=>({...p, sx:X(p.x), sy:Y(p.y)})), W};
+}
+
+function bindChart(box, c){
+  if (!c.pts.length) return;
+  const svg=box.querySelector("svg"), tip=box.querySelector(".tip"),
+        xh=svg.querySelector(".xh"), dot=svg.querySelector(".dot");
+  const move = ev => {
+    const r=svg.getBoundingClientRect(), cx=(ev.clientX-r.left)/r.width*c.W;
+    let best=c.pts[0]; for (const p of c.pts) if (Math.abs(p.sx-cx)<Math.abs(best.sx-cx)) best=p;
+    xh.setAttribute("x1",best.sx); xh.setAttribute("x2",best.sx); xh.setAttribute("opacity",1);
+    dot.setAttribute("cx",best.sx); dot.setAttribute("cy",best.sy); dot.setAttribute("opacity",1);
+    tip.innerHTML=`<b>${n(best.y)}</b> follower · ${dateFmt.format(best.x)}`;
+    tip.style.left=(best.sx/c.W*r.width)+"px"; tip.style.top=(best.sy/120*r.height)+"px"; tip.style.opacity=1;
+  };
+  const out = () => { xh.setAttribute("opacity",0); dot.setAttribute("opacity",0); tip.style.opacity=0; };
+  svg.addEventListener("pointermove",move); svg.addEventListener("pointerdown",move); svg.addEventListener("pointerleave",out);
+}
+
+function renderCards(){
+  const el=document.getElementById("cards");
+  el.innerHTML="";
+  for (const r of rows()){
+    const p=r.p, c=chartSvg(r.h);
+    const posts=(p.recent_posts||[]).map(x=>`<li>
+      <span class="type">${esc(x.type)}</span>
+      <span class="cap">${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.caption)||"(senza didascalia)"}</a>`:esc(x.caption)}</span>
+      <span class="m" title="like · commenti${x.views!=null?" · views":""}">♥ ${short(x.likes)} · 💬 ${short(x.comments)}${x.views!=null?" · ▶ "+short(x.views):""}</span>
+    </li>`).join("");
+    const card=document.createElement("article");
+    card.className="panel card"; card.id="p-"+r.u;
+    card.innerHTML=`
+      <div class="card-head">
+        <div class="avatar">${esc((r.u[0]||"?").toUpperCase())}</div>
+        <div style="min-width:0">
+          <div class="name"><a href="https://www.instagram.com/${esc(r.u)}/" target="_blank" rel="noopener">@${esc(r.u)}</a>${p.is_verified?" ✓":""}</div>
+          <div class="full">${esc(p.full_name||"")}${p.is_private?" · profilo privato":""}</div>
+        </div>
+      </div>
+      ${p.ok===false?`<div class="warn">⚠️ Ultimo tentativo non riuscito (${esc(p.error)}). ${p.fetched_at?"Dati del "+dateFmt.format(Date.parse(p.fetched_at))+".":"Nessun dato ancora raccolto: riproverà al prossimo giro."}</div>`:""}
+      ${p.fetched_at?`<div class="hero"><span class="n">${n(p.followers)}</span><span class="lbl">follower</span></div>
+      <div class="deltas"><span>24 ore <b>${deltaHtml(r.d1)}</b></span><span>7 giorni <b>${deltaHtml(r.d7)}</b></span></div>
+      <div class="chart">${c.html}</div>
+      <div class="stats">
+        <div class="stat"><div class="v">${n(p.posts_count)}</div><div class="k">Post</div></div>
+        <div class="stat"><div class="v">${n(p.following)}</div><div class="k">Seguiti</div></div>
+        <div class="stat"><div class="v">${r.er==null?"—":fmt1.format(r.er)+"%"}</div><div class="k">Engagement</div></div>
+        <div class="stat"><div class="v">${n(p.avg_likes)}</div><div class="k">Like medi</div></div>
+        <div class="stat"><div class="v">${n(p.avg_comments)}</div><div class="k">Commenti medi</div></div>
+        <div class="stat"><div class="v">${n(p.avg_views)}</div><div class="k">Views medie reel</div></div>
+      </div>
+      ${posts?`<details class="posts"><summary>Ultimi ${(p.recent_posts||[]).length} post</summary><ul>${posts}</ul></details>`:""}`:""}`;
+    el.appendChild(card);
+    bindChart(card.querySelector(".chart"), c);
+  }
+}
+
+function render(){ renderSummary(); renderCards(); }
+
+document.querySelectorAll("#range button").forEach(b=>{
+  b.setAttribute("aria-pressed", String(+b.dataset.days===RANGE));
+  b.onclick=()=>{
+    RANGE=+b.dataset.days;
+    try{localStorage.setItem("range",RANGE)}catch(e){}
+    document.querySelectorAll("#range button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+    renderCards();
+  };
+});
+
+// I dati sono cifrati (AES-256-GCM, chiave PBKDF2-SHA256): si leggono solo con la password
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+let PASSWORD = null;
+try { PASSWORD = localStorage.getItem("pw") || sessionStorage.getItem("pw"); } catch(e){}
+
+async function decryptVault(v, password){
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({name:"PBKDF2", salt:unb64(v.salt), iterations:v.iter, hash:"SHA-256"},
+    base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
+  const plain = await crypto.subtle.decrypt({name:"AES-GCM", iv:unb64(v.iv)}, key, unb64(v.ct));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+function showLock(msg){
+  document.getElementById("app").hidden = true;
+  document.getElementById("lock").hidden = false;
+  document.getElementById("pwerr").textContent = msg || "";
+  document.getElementById("pw").focus();
+}
+
+document.getElementById("lock").onsubmit = async ev => {
+  ev.preventDefault();
+  PASSWORD = document.getElementById("pw").value;
+  const remember = document.getElementById("remember").checked;
+  try { (remember ? localStorage : sessionStorage).setItem("pw", PASSWORD); } catch(e){}
+  await load();
+};
+
+async function load(){
+  if (!PASSWORD) return showLock();
+  let vault;
+  try { vault = await getJSON("data.enc"); } catch(e) { vault = null; }
+  if (vault) {
+    try { var bundle = await decryptVault(vault, PASSWORD); }
+    catch(e) {
+      PASSWORD = null;
+      try { localStorage.removeItem("pw"); sessionStorage.removeItem("pw"); } catch(e2){}
+      return showLock("Password errata.");
+    }
+  }
+  document.getElementById("lock").hidden = true;
+  document.getElementById("app").hidden = false;
+  try{
+    if (!bundle) throw new Error("nessun dato");
+    const latest=bundle.latest;
+    const hist={};
+    latest.order.forEach(u=>{ hist[u]=bundle.history[u]||[]; });
+    STATE={latest,hist};
+    const ok=latest.order.filter(u=>latest.profiles[u]?.ok).length;
+    document.getElementById("updated").textContent=
+      `Ultimo giro: ${dateFmt.format(Date.parse(latest.updated))} · ${ok}/${latest.order.length} profili aggiornati`;
+    render();
+  }catch(e){
+    document.getElementById("updated").textContent="";
+    document.getElementById("cards").innerHTML='<div class="msg">Ancora nessun dato: il primo giro del tracker non è stato completato.</div>';
+  }
+}
+load();
+setInterval(load, 15*60e3); // ricarica i dati ogni 15 minuti se la pagina resta aperta
+</script>
+</body>
+</html>
