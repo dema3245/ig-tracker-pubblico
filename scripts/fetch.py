@@ -181,10 +181,17 @@ def fetch_apify_posts(usernames, token):
     """Ultimi post dei profili per cui lo scraper dei profili non li ha dati: {username: [post]}."""
     items = apify_call(APIFY_POSTS_URL, {"username": usernames, "resultsLimit": POSTS_PER_PROFILE}, token)
     out = {}
+    errors = []
     for it in items:
         owner = (it.get("ownerUsername") or "").lower()
-        if owner and not it.get("error"):
+        if it.get("error") or not owner:
+            errors.append(str(it.get("errorDescription") or it.get("error") or "risultato senza autore"))
+        else:
             out.setdefault(owner, []).append(it)
+    # Niente username nei log (repo pubblico): solo i conteggi in ordine
+    print(f"  ricevuti {len(items)} risultati; post per profilo: {[len(out.get(u, [])) for u in usernames]}")
+    for e in sorted(set(errors)):
+        print(f"  avviso Apify: {e[:200]}")
     return out
 
 
