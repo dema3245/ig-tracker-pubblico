@@ -14,6 +14,7 @@ Usa solo la libreria standard di Python: nessuna dipendenza da installare.
 import json
 import os
 import random
+import re
 import sys
 import time
 import urllib.error
@@ -191,6 +192,8 @@ def fetch_apify_posts(usernames, token):
     # Niente username nei log (repo pubblico): solo i conteggi in ordine
     print(f"  ricevuti {len(items)} risultati; post per profilo: {[len(out.get(u, [])) for u in usernames]}")
     for e in sorted(set(errors)):
+        for u in usernames:
+            e = re.sub(re.escape(u), "***", e, flags=re.IGNORECASE)
         print(f"  avviso Apify: {e[:200]}")
     return out
 
