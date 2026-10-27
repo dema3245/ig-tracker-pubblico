@@ -29,8 +29,13 @@ Chi apre il sito senza password vede solo la schermata di accesso.
 
 ## Uso quotidiano
 
-- **Aggiungere o togliere un profilo:** modifica il secret `PROFILES` (*Settings → Secrets and variables → Actions*), poi *Run workflow*. Il profilo tolto sparisce dalla dashboard, il suo storico resta nel file cifrato.
-- **Cambiare password:** non cambiare solo il secret, altrimenti lo storico già cifrato non si legge più. Se la cambi, cancella anche `docs/data.enc` (lo storico riparte da zero).
+- **Aggiungere o togliere un profilo:** nella dashboard premi **Gestisci profili**, aggiungi lo username (o incolla il link del profilo) e premi *Salva*.
+  Il tracker parte da solo e i dati arrivano in pochi minuti. La lista viene salvata cifrata in `docs/profiles.enc` e da quel momento
+  ha la precedenza sul secret `PROFILES`. Il profilo tolto sparisce dalla dashboard, il suo storico resta nel file cifrato.
+  La prima volta serve un **token GitHub** (fine-grained, solo questo repository, permessi *Contents* e *Actions* in *Read and write*):
+  le istruzioni sono nella finestra stessa e il token resta salvato solo sul tuo dispositivo.
+- **Aggiorna ora:** con il token salvato lancia subito una raccolta; senza token apre la pagina di GitHub dove premere *Run workflow*.
+- **Cambiare password:** non cambiare solo il secret, altrimenti lo storico già cifrato non si legge più. Se la cambi, cancella anche `docs/data.enc` e `docs/profiles.enc` (lo storico riparte da zero e la lista profili torna al secret `PROFILES`).
 - **Aggiornare subito:** *Actions → Aggiorna tracker → Run workflow*.
 - **Cambiare frequenza:** in `.github/workflows/track.yml` la riga `cron: "17 */6 * * *"` (orario UTC). Sotto le 3 ore aumenta il rischio di blocchi.
 
@@ -49,4 +54,5 @@ Chi apre il sito senza password vede solo la schermata di accesso.
 | `scripts/vault.py` | Cifra e decifra i dati con la password |
 | `.github/workflows/track.yml` | Pianificazione ogni 6 ore e pubblicazione |
 | `docs/index.html` | La dashboard |
-| `docs/data.enc` | Dati e storico cifrati (creato in automatico) |
+| `docs/data.enc` | Dati, storico e archivio dei post cifrati (creato in automatico) |
+| `docs/profiles.enc` | Lista profili salvata dalla dashboard, cifrata |

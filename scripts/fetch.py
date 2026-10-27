@@ -1,10 +1,12 @@
 """
 Tracker Instagram senza token.
 
-Legge i profili dal secret PROFILES (o da profiles.json, se esiste), scarica i dati PUBBLICI di ogni profilo
+Legge i profili dalla lista gestita dalla dashboard (docs/profiles.enc, decifrata da
+vault.py), oppure dal secret PROFILES o da profiles.json; scarica i dati PUBBLICI di ogni profilo
 (follower, seguiti, post, ultimi ~12 post con like/commenti/views) e li salva in:
   docs/data/latest.json            -> stato attuale di tutti i profili
   docs/data/history/<username>.json -> storico per i grafici di crescita
+  docs/data/posts/<username>.json   -> archivio dei post (ultime metriche di ognuno)
 
 Usa solo la libreria standard di Python: nessuna dipendenza da installare.
 """
@@ -22,6 +24,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROFILES_FILE = os.path.join(ROOT, "profiles.json")
 DATA_DIR = os.path.join(ROOT, "docs", "data")
 HIST_DIR = os.path.join(DATA_DIR, "history")
+POSTS_DIR = os.path.join(DATA_DIR, "posts")
+MANAGED_PROFILES = os.path.join(DATA_DIR, "profiles.json")  # da docs/profiles.enc
+MAX_ARCHIVED_POSTS = 500
 LATEST_FILE = os.path.join(DATA_DIR, "latest.json")
 
 ENDPOINTS = [
@@ -129,9 +134,11 @@ def parse_user(u):
             "comments": count(n.get("edge_media_to_comment")),
             "views": views if isinstance(views, int) and views >= 0 else None,
             "caption": " ".join(caption.split())[:160],
+            "thumb": n.get("thumbnail_src") or n.get("display_url"),
         })
     return {
         "username": u.get("username"),
+        "pic": u.get("profile_pic_url"),
         "full_name": u.get("full_name") or "",
         "bio": u.get("biography") or "",
         "is_verified": bool(u.get("is_verified")),
@@ -180,9 +187,11 @@ def parse_apify(it):
             "comments": num(p.get("commentsCount")),
             "views": num(p.get("videoViewCount")) or num(p.get("videoPlayCount")),
             "caption": " ".join((p.get("caption") or "").split())[:160],
+            "thumb": p.get("displayUrl"),
         })
     return {
         "username": (it.get("username") or "").lower(),
+        "pic": it.get("profilePicUrl"),
         "full_name": it.get("fullName") or "",
         "bio": it.get("biography") or "",
         "is_verified": bool(it.get("verified")),
@@ -194,16 +203,32 @@ def parse_apify(it):
     }
 
 
+def archive_posts(username, posts, ts):
+    """Tiene l'ultima versione di ogni post visto, per la tabella e gli orari migliori."""
+    path = os.path.join(POSTS_DIR, f"{username}.json")
+    archive = load_json(path, {})
+    for p in posts:
+        if not p.get("shortcode"):
+            continue
+        entry = archive.get(p["shortcode"], {"first_seen": ts})
+        entry.update(p)
+        entry["updated"] = ts
+        archive[p["shortcode"]] = entry
+    newest = sorted(archive.items(), key=lambda kv: kv[1].get("ts") or 0, reverse=True)
+    save_json(path, dict(newest[:MAX_ARCHIVED_POSTS]))
+
+
 def avg(values):
     vals = [v for v in values if isinstance(v, (int, float))]
     return round(sum(vals) / len(vals), 1) if vals else None
 
 
 def load_usernames():
-    """Dal secret PROFILES (username separati da virgola, spazio o a capo),
-    altrimenti da profiles.json."""
+    """Dalla lista gestita dalla dashboard; se non c'è, dal secret PROFILES
+    (username separati da virgola, spazio o a capo), altrimenti da profiles.json."""
+    managed = load_json(MANAGED_PROFILES, {}).get("profiles")
     raw = os.environ.get("PROFILES", "").replace(",", " ").split()
-    names = raw or load_json(PROFILES_FILE, [])
+    names = managed if isinstance(managed, list) else (raw or load_json(PROFILES_FILE, []))
     out = []
     for u in names:
         u = u.strip().lstrip("@").lower()
@@ -281,6 +306,7 @@ def main():
             "avg_views": data["avg_views"],
         })
         save_json(hist_path, history)
+        archive_posts(username, posts, ts)
 
     # Togli dalla dashboard i profili rimossi da profiles.json (lo storico resta)
     profiles = {u: profiles[u] for u in usernames if u in profiles}

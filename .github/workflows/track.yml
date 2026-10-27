@@ -8,6 +8,7 @@ on:
     branches: [main]
     paths:
       - docs/index.html       # se modifichi la dashboard viene ripubblicata
+      - docs/profiles.enc     # profili aggiunti/tolti dalla dashboard: parte subito
 
 permissions:
   contents: write
