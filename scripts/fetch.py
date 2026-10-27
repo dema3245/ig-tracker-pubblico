@@ -38,7 +38,8 @@ HEADERS = {
     "Accept": "application/json",
     "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
 }
-MAX_ATTEMPTS = 4
+MAX_ATTEMPTS = 2
+TIMEOUT = 15  # secondi di attesa massima per ogni risposta di Instagram
 
 
 def now_iso():
@@ -63,7 +64,7 @@ def save_json(path, data):
 
 def http_get_json(url):
     req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -88,8 +89,10 @@ def fetch_profile(username):
                     raise RuntimeError("profilo inesistente (404)")
             except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
                 last_err = RuntimeError(f"rete/risposta non valida: {e}")
-        # Pausa crescente prima del nuovo tentativo (limita i blocchi 401/429)
-        wait = 20 * (attempt + 1) + random.uniform(0, 10)
+        if attempt == MAX_ATTEMPTS - 1:
+            break
+        # Pausa prima del nuovo tentativo (limita i blocchi 401/429)
+        wait = 15 + random.uniform(0, 10)
         print(f"  tentativo {attempt + 1} fallito ({last_err}), attendo {wait:.0f}s")
         time.sleep(wait)
     raise last_err or RuntimeError("errore sconosciuto")
@@ -160,6 +163,7 @@ def main():
         print("::error::Nessun profilo: imposta il secret PROFILES con gli username da seguire.")
         return 1
 
+    print(f"Avvio: {len(usernames)} profili da aggiornare")
     latest = load_json(LATEST_FILE, {"profiles": {}})
     profiles = latest.get("profiles", {})
     ts = now_iso()
