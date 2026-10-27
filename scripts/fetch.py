@@ -47,6 +47,10 @@ HEADERS = {
 # come i server di GitHub (HTTP 429). Senza token si interroga Instagram direttamente.
 APIFY_URL = ("https://api.apify.com/v2/acts/apify~instagram-profile-scraper/"
              "run-sync-get-dataset-items?timeout=280")
+# Per alcuni profili lo scraper dei profili non restituisce i post: li chiediamo a quello dei post
+APIFY_POSTS_URL = ("https://api.apify.com/v2/acts/apify~instagram-post-scraper/"
+                   "run-sync-get-dataset-items?timeout=280")
+POSTS_PER_PROFILE = 12
 MAX_ATTEMPTS = 2
 TIMEOUT = 15  # secondi di attesa massima per ogni risposta di Instagram
 
@@ -150,11 +154,9 @@ def parse_user(u):
     }
 
 
-def fetch_apify(usernames, token):
-    """Un'unica chiamata per tutti i profili: ritorna {username: risultato Apify}."""
+def apify_call(url, payload, token):
     req = urllib.request.Request(
-        APIFY_URL, method="POST",
-        data=json.dumps({"usernames": usernames}).encode("utf-8"),
+        url, method="POST", data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
     )
     try:
@@ -163,32 +165,53 @@ def fetch_apify(usernames, token):
     except urllib.error.HTTPError as e:
         hint = {401: "token non valido", 402: "crediti Apify esauriti"}.get(e.code, "")
         raise RuntimeError(f"Apify HTTP {e.code} {hint}".strip())
-    return {(it.get("username") or "").lower(): it for it in items if isinstance(it, dict)}
+    return [it for it in items if isinstance(it, dict)]
 
 
-def parse_apify(it):
-    def num(v):
-        return v if isinstance(v, int) and v >= 0 else None
+def fetch_apify(usernames, token):
+    """Un'unica chiamata per tutti i profili: ritorna {username: risultato Apify}."""
+    items = apify_call(APIFY_URL, {"usernames": usernames}, token)
+    return {(it.get("username") or "").lower(): it for it in items}
 
-    posts = []
-    for p in it.get("latestPosts") or []:
-        ts = None
-        try:
-            ts = int(datetime.fromisoformat(p["timestamp"].replace("Z", "+00:00")).timestamp())
-        except (KeyError, TypeError, ValueError, AttributeError):
-            pass
-        sc = p.get("shortCode")
-        posts.append({
-            "shortcode": sc,
-            "url": p.get("url") or (f"https://www.instagram.com/p/{sc}/" if sc else None),
-            "ts": ts,
-            "type": {"Video": "reel", "Sidecar": "carosello", "Image": "foto"}.get(p.get("type"), "post"),
-            "likes": num(p.get("likesCount")),
-            "comments": num(p.get("commentsCount")),
-            "views": num(p.get("videoViewCount")) or num(p.get("videoPlayCount")),
-            "caption": " ".join((p.get("caption") or "").split())[:160],
-            "thumb": p.get("displayUrl"),
-        })
+
+def fetch_apify_posts(usernames, token):
+    """Ultimi post dei profili per cui lo scraper dei profili non li ha dati: {username: [post]}."""
+    items = apify_call(APIFY_POSTS_URL, {"username": usernames, "resultsLimit": POSTS_PER_PROFILE}, token)
+    out = {}
+    for it in items:
+        owner = (it.get("ownerUsername") or "").lower()
+        if owner and not it.get("error"):
+            out.setdefault(owner, []).append(it)
+    return out
+
+
+def num(v):
+    return v if isinstance(v, int) and v >= 0 else None
+
+
+def parse_apify_post(p):
+    ts = None
+    try:
+        ts = int(datetime.fromisoformat(p["timestamp"].replace("Z", "+00:00")).timestamp())
+    except (KeyError, TypeError, ValueError, AttributeError):
+        pass
+    sc = p.get("shortCode")
+    return {
+        "shortcode": sc,
+        "url": p.get("url") or (f"https://www.instagram.com/p/{sc}/" if sc else None),
+        "ts": ts,
+        "type": {"Video": "reel", "Sidecar": "carosello", "Image": "foto"}.get(p.get("type"), "post"),
+        "likes": num(p.get("likesCount")),
+        "comments": num(p.get("commentsCount")),
+        "views": num(p.get("videoViewCount")) or num(p.get("videoPlayCount")),
+        "caption": " ".join((p.get("caption") or "").split())[:160],
+        "thumb": p.get("displayUrl"),
+    }
+
+
+def parse_apify(it, extra_posts=None):
+    raw = it.get("latestPosts") or extra_posts or []
+    posts = sorted((parse_apify_post(p) for p in raw), key=lambda p: p["ts"] or 0, reverse=True)
     return {
         "username": (it.get("username") or "").lower(),
         "pic": it.get("profilePicUrl"),
@@ -199,7 +222,7 @@ def parse_apify(it):
         "followers": num(it.get("followersCount")),
         "following": num(it.get("followsCount")),
         "posts_count": num(it.get("postsCount")),
-        "recent_posts": posts[:12],
+        "recent_posts": posts[:POSTS_PER_PROFILE],
     }
 
 
@@ -258,6 +281,16 @@ def main():
             apify = fetch_apify(usernames, token)
         except Exception as e:  # noqa: BLE001
             apify, apify_error = {}, str(e)
+        missing = [u for u, it in apify.items()
+                   if it.get("username") and not it.get("private") and not it.get("latestPosts")]
+        if missing:
+            print(f"Post mancanti per {len(missing)} profili: li chiedo allo scraper dei post")
+            try:
+                extra = fetch_apify_posts(missing, token)
+                for u in missing:
+                    apify[u]["_extra_posts"] = extra.get(u, [])
+            except Exception as e:  # noqa: BLE001
+                print(f"  non riuscito: {e}")
     else:
         print("Fonte: Instagram diretto (nessun APIFY_TOKEN)")
 
@@ -275,7 +308,7 @@ def main():
                     raise RuntimeError(apify_error or "profilo non restituito da Apify")
                 if item.get("error") or not item.get("username"):
                     raise RuntimeError("profilo inesistente o non leggibile")
-                data = parse_apify(item)
+                data = parse_apify(item, item.get("_extra_posts"))
         except Exception as e:  # noqa: BLE001
             print(f"  ERRORE: {e}")
             prev = profiles.get(username, {"username": username})

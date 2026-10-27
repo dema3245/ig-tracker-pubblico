@@ -397,6 +397,12 @@ function avatar(p){
   const init = esc((p.username || "?")[0].toUpperCase());
   return `<div class="av">${init}${p.pic ? `<img src="${esc(p.pic)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</div>`;
 }
+function warn(p){
+  if (!p.ok) return `<div class="cwarn">⚠ ${esc(p.error || "ultimo giro non riuscito")}</div>`;
+  if (p.is_private) return `<div class="cwarn">Profilo privato: post e medie non sono visibili.</div>`;
+  if (!(p.recent_posts || []).length) return `<div class="cwarn">Instagram non ha restituito i post in questo giro: medie non disponibili.</div>`;
+  return "";
+}
 function head(p){
   return `<div class="ch">${avatar(p)}<div style="min-width:0"><div class="nm">@${esc(p.username)}${p.is_verified ? " ✓" : ""}</div>
     <div class="fn">${esc(p.full_name || (p.is_private ? "Profilo privato" : ""))}</div></div></div>`;
@@ -429,7 +435,7 @@ function renderOverview(){
         <span>Engagement <b>${er(p) == null ? "—" : fmt2.format(er(p)) + "%"}</b></span>
         <span>Like medi <b>${short(p.avg_likes)}</b></span>
         <span>Views medie <b>${short(p.avg_views)}</b></span>
-      </div>${p.ok ? "" : `<div class="cwarn">⚠ ${esc(p.error || "ultimo giro non riuscito")}</div>`}</button>`;
+      </div>${warn(p)}</button>`;
   }).join("");
   $("ovCards").querySelectorAll("[data-u]").forEach(c => c.onclick = () => select(c.dataset.u));
 
@@ -497,7 +503,7 @@ function renderProfile(u){
     <div class="card">${head(p)}<div class="big">${n(p.followers)} <small>follower</small></div>
       <div class="mini"><span>24 ore <b class="${cls(d24)}">${signed(d24)}</b></span><span>7 giorni <b class="${cls(d7)}">${signed(d7)}</b></span>
       <span>Periodo <b class="${cls(dr)}">${signed(dr)}</b></span><span>Seguiti <b>${n(p.following)}</b>${dfg ? ` <span class="${cls(dfg)}">(${signed(dfg)})</span>` : ""}</span></div>
-      ${p.ok ? "" : `<div class="cwarn">⚠ ${esc(p.error || "ultimo giro non riuscito")}</div>`}</div>
+      ${warn(p)}</div>
     <div class="card"><h3>Engagement medio</h3><div class="big">${e == null ? "—" : fmt2.format(e) + "%"}</div>
       <div class="mini"><span>Like medi <b>${n(p.avg_likes)}</b></span><span>Commenti medi <b>${n(p.avg_comments)}</b></span></div></div>
     <div class="card"><h3>Views medie dei reel</h3><div class="big">${n(p.avg_views)}</div>
